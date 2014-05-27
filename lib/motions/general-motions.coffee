@@ -1,5 +1,6 @@
 _ = require 'underscore-plus'
 {$$, Point, Range} = require 'atom'
+{ForwardMotionMixin, BackwardMotionMixin, DynamicMotionMixin} = require './motion-mixins'
 
 class MotionError
   constructor: (@message) ->
@@ -37,6 +38,8 @@ class MotionWithInput extends Motion
     @complete = true
 
 class MoveLeft extends Motion
+  BackwardMotionMixin.includeInto(@)
+
   execute: (count=1) ->
     _.times count, =>
       {row, column} = @editor.getCursorScreenPosition()
@@ -53,6 +56,8 @@ class MoveLeft extends Motion
         false
 
 class MoveRight extends Motion
+  ForwardMotionMixin.includeInto(@)
+
   execute: (count=1) ->
     _.times count, =>
       {row, column} = @editor.getCursorScreenPosition()
@@ -72,6 +77,8 @@ class MoveRight extends Motion
         false
 
 class MoveUp extends Motion
+  BackwardMotionMixin.includeInto(@)
+
   execute: (count=1) ->
     _.times count, =>
       {row, column} = @editor.getCursorScreenPosition()
@@ -83,6 +90,8 @@ class MoveUp extends Motion
       true
 
 class MoveDown extends Motion
+  ForwardMotionMixin.includeInto(@)
+
   execute: (count=1) ->
     _.times count, =>
       {row, column} = @editor.getCursorScreenPosition()
@@ -94,6 +103,8 @@ class MoveDown extends Motion
       true
 
 class MoveToPreviousWord extends Motion
+  BackwardMotionMixin.includeInto(@)
+
   execute: (count=1) ->
     _.times count, =>
       @editor.moveCursorToBeginningOfWord()
@@ -104,6 +115,8 @@ class MoveToPreviousWord extends Motion
       true
 
 class MoveToPreviousWholeWord extends Motion
+  BackwardMotionMixin.includeInto(@)
+
   execute: (count=1) ->
     _.times count, =>
       @editor.moveCursorToBeginningOfWord()
@@ -120,10 +133,12 @@ class MoveToPreviousWholeWord extends Motion
     char is ' ' or char is '\n'
 
   isBeginningOfFile: ->
-    cur = @editor.getCursorBufferPosition();
+    cur = @editor.getCursorBufferPosition()
     not cur.row and not cur.column
 
 class MoveToNextWord extends Motion
+  ForwardMotionMixin.includeInto(@)
+
   execute: (count=1) ->
     cursor = @editor.getCursor()
 
@@ -164,6 +179,8 @@ class MoveToNextWord extends Motion
     cur.row is eof.row and cur.column is eof.column
 
 class MoveToNextWholeWord extends Motion
+  ForwardMotionMixin.includeInto(@)
+
   execute: (count=1) ->
     _.times count, =>
       @editor.moveCursorToBeginningOfNextWord()
@@ -194,6 +211,8 @@ class MoveToNextWholeWord extends Motion
     last.row is cur.row and last.column is cur.column
 
 class MoveToEndOfWord extends Motion
+  ForwardMotionMixin.includeInto(@)
+
   execute: (count=1) ->
     cursor = @editor.getCursor()
     _.times count, =>
@@ -229,6 +248,8 @@ class MoveToEndOfWord extends Motion
     next
 
 class MoveToEndOfWholeWord extends Motion
+  ForwardMotionMixin.includeInto(@)
+
   execute: (count=1) ->
     cursor = @editor.getCursor()
     _.times count, =>
@@ -261,6 +282,8 @@ class MoveToEndOfWholeWord extends Motion
     position
 
 class MoveToNextParagraph extends Motion
+  ForwardMotionMixin.includeInto(@)
+
   execute: (count=1) ->
     _.times count, =>
       @editor.setCursorScreenPosition(@nextPosition())
@@ -288,6 +311,8 @@ class MoveToNextParagraph extends Motion
     @editor.screenPositionForBufferPosition(position)
 
 class MoveToPreviousParagraph extends Motion
+  BackwardMotionMixin.includeInto(@)
+
   execute: (count=1) ->
     _.times count, =>
       @editor.setCursorScreenPosition(@previousPosition())
@@ -312,6 +337,8 @@ class MoveToPreviousParagraph extends Motion
     @editor.screenPositionForBufferPosition(position)
 
 class MoveToLine extends Motion
+  DynamicMotionMixin.includeInto(@)
+
   isLinewise: -> true
 
   execute: (count) ->
@@ -362,6 +389,8 @@ class MoveToScreenLine extends MoveToLine
     @editor.setCursorScreenPosition([@getDestinationRow(count), 0])
 
 class MoveToBeginningOfLine extends Motion
+  BackwardMotionMixin.includeInto(@)
+
   execute: (count=1) ->
     @editor.moveCursorToBeginningOfLine()
 
@@ -371,6 +400,8 @@ class MoveToBeginningOfLine extends Motion
       true
 
 class MoveToFirstCharacterOfLine extends Motion
+  BackwardMotionMixin.includeInto(@)
+
   constructor:(@editor) ->
     @cursor = @editor.getCursor()
     super(@editor)
@@ -388,6 +419,8 @@ class MoveToFirstCharacterOfLine extends Motion
     @editor.lineForBufferRow(@cursor.getBufferRow()).search(/\S/)
 
 class MoveToLastCharacterOfLine extends Motion
+  ForwardMotionMixin.includeInto(@)
+
   execute: (count=1) ->
     _.times count, =>
       @editor.moveCursorToEndOfLine()
@@ -399,6 +432,8 @@ class MoveToLastCharacterOfLine extends Motion
       true
 
 class MoveToStartOfFile extends MoveToLine
+  BackwardMotionMixin.includeInto(@)
+
   getDestinationRow: (count=1) ->
     count - 1
 
@@ -408,6 +443,8 @@ class MoveToStartOfFile extends MoveToLine
     @editor.setSelectedBufferRange(bufferRange, reversed: true)
 
 class MoveToTopOfScreen extends MoveToScreenLine
+  BackwardMotionMixin.includeInto(@)
+
   getDestinationRow: (count=0) ->
     firstScreenRow = @editorView.getFirstVisibleScreenRow()
     if firstScreenRow > 0
@@ -417,6 +454,8 @@ class MoveToTopOfScreen extends MoveToScreenLine
     firstScreenRow + offset
 
 class MoveToBottomOfScreen extends MoveToScreenLine
+  ForwardMotionMixin.includeInto(@)
+
   getDestinationRow: (count=0) ->
     lastScreenRow = @editorView.getLastVisibleScreenRow()
     lastRow = @editor.getBuffer().getLastRow()
@@ -427,6 +466,8 @@ class MoveToBottomOfScreen extends MoveToScreenLine
     lastScreenRow - offset
 
 class MoveToMiddleOfScreen extends MoveToScreenLine
+  DynamicMotionMixin.includeInto(@)
+
   getDestinationRow: (count) ->
     firstScreenRow = @editorView.getFirstVisibleScreenRow()
     lastScreenRow = @editorView.getLastVisibleScreenRow()

@@ -14,12 +14,15 @@ module.exports =
 class VimState
   editor: null
   opStack: null
+  visOpStack: null
+  visCursorRange: null
   mode: null
   submode: null
 
   constructor: (@editorView) ->
     @editor = @editorView.editor
     @opStack = []
+    @visOpStack = []
     @history = []
     @marks = {}
 
@@ -52,6 +55,8 @@ class VimState
       if @mode == 'insert'
         true
       else
+        @visCursorRange = null
+        @clearVisOpStack()
         @clearOpStack()
         false
 
@@ -179,6 +184,7 @@ class VimState
       # Motions in visual mode perform their selections.
       if @mode is 'visual' and (operation instanceof Motions.Motion or operation instanceof TextObjects.TextObject)
         operation.execute = operation.select
+        @visOpStack.push(operation)
 
       # if we have started an operation that responds to canComposeWith check if it can compose
       # with the operation we're going to push onto the stack
@@ -195,12 +201,19 @@ class VimState
         @opStack.push(new Motions.CurrentSelection(@))
 
       @processOpStack()
+      @processVisOpStack()
 
   # Private: Removes all operations from the stack.
   #
   # Returns nothing.
   clearOpStack: ->
     @opStack = []
+
+  # Private: Removes all operations from the visual operation stack.
+  #
+  # Returns nothing.
+  clearVisOpStack: ->
+    @visOpStack = []
 
   # Private: Processes the command if the last operation is complete.
   #
@@ -225,11 +238,38 @@ class VimState
       @history.unshift(poppedOperation) if poppedOperation.isRecordable()
       poppedOperation.execute()
 
+  # Private: Processes the visual command to compensate for select range.
+  #
+  # Returns nothing.
+  processVisOpStack: ->
+    return if not @visOpStack.length > 0 or not @mode is 'visual'
+    [origStart, origEnd] = @visCursorRange
+    [origStartRow, origStartColumn] = origStart
+    [origEndRow, origEndColumn] = origEnd
+    {start, end} = @editor.getSelectedScreenRange()
+
+    if (top = @topVisOperation()).isForwardMotion?
+      if top.isForwardMotion()
+        if start.row is origStartRow and start.column isnt origStartColumn
+          @editor.setSelectedScreenRange([[start.row, origStartColumn], [end.row, end.column]])
+      else
+        if end.row is origEndRow and end.column isnt origEndColumn
+          @editor.setSelectedScreenRange([[start.row, start.column], [end.row, origEndColumn]])
+
+    @visOpStack.pop()
+
+
   # Private: Fetches the last operation.
   #
   # Returns the last operation.
   topOperation: ->
     _.last @opStack
+
+  # Private: Fetches the last visual operation.
+  #
+  # Returns the last operation.
+  topVisOperation: ->
+    _.last @visOpStack
 
   # Private: Fetches the value of a given register.
   #
@@ -319,6 +359,8 @@ class VimState
 
     @changeModeClass('command-mode')
 
+    @visCursorRange = null
+    @clearVisOpStack()
     @clearOpStack()
     @editor.clearSelections()
 
@@ -346,6 +388,11 @@ class VimState
 
     if @submode == 'linewise'
       @editor.selectLine()
+    else
+      {row, column} = @editor.getCursorScreenPosition()
+      @visCursorRange = [[row, column], [row, column + 1]]
+      @editor.moveCursorRight()
+      @editor.selectLeft()
 
     @updateStatusBar()
 
